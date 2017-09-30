@@ -6,14 +6,12 @@ using Amazon.Lambda.Core;
 using Alexa.NET;
 using Alexa.NET.Request;
 using Alexa.NET.Response;
-using Alexa.NET.Response.Directive;
-using Alexa.NET.Response.Directive.Templates;
-using Alexa.NET.Response.Directive.Templates.Types;
 
 using System.Net.Http;
 using Newtonsoft.Json;
 using Alexa.NET.Request.Type;
 using System.Linq;
+using Alexa.BridgeBot.Lambda.viewmodels;
 
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
@@ -27,9 +25,10 @@ namespace Alexa.BridgeBot.Lambda
 
         Dictionary<string, string> Bridges => new Dictionary<string, string>
         {
-            {"san mateo", "37.573331,-122.262676,37.618759,-122.149551" },
-            {"oakland", "" },
-            {"golden gate", "" }
+            {"san mateo", "37.564618,-122.272450,37.631134,-122.112215 " },
+            {"dumbarton", "37.489248,-122.139863,37.537884,-122.070231" },
+            {"san francisco bay", "37.537884,-122.070231,37.822621,-122.321842" },
+            {"golden gate", "37.809331,-122.479695,37.829536,-122.477367" }
         };
 
         private ILambdaContext Context { get; set; }
@@ -55,16 +54,17 @@ namespace Alexa.BridgeBot.Lambda
         public SkillResponse HandleBridgeTrafficIntent(SkillRequest input)
         {
             // Log the method type for debugging purposes
-            Context.Logger.LogLine("Calling SendDirections Intent");
+            Context.Logger.LogLine("Calling HandleBridgeTrafficIntent Intent");
 
-            string title = "Liquid Summit Directions";
-            string speech = "Thank you for your interest in the Liquid Summit Conference.  You can find directions to the event in your Alexa app.";
+            string title = "Bridge Traffic";
+            string speech = "I'm sorry, we couldn't find the bridge you are looking for.";
 
+            
 
-            var directions = GetDirectionsAsync().Result;
+            //var traffic = GetTrafficInfoAsync().Result;
 
-            if (directions is null)
-            {
+            //if (traffic is null)
+            //{
                 return ResponseBuilder.TellWithCard(
                     new PlainTextOutputSpeech()
                     {
@@ -73,86 +73,97 @@ namespace Alexa.BridgeBot.Lambda
                     title,
                     speech
                 );
-            }
+            //}
 
-            return new SkillResponse()
-            {
-                Version = "1.0",
-                Response = new ResponseBody()
-                {
-                    Card = new StandardCard()
-                    {
-                        Title = $"{title}",
-                        Content = $"{directions.details.directions}",
-                        Image = new CardImage
-                        {
-                            SmallImageUrl = directions.details.mapImage.First().url,
-                            LargeImageUrl = directions.details.mapImage.First().url
-                        }
-                    },
-                    OutputSpeech = new PlainTextOutputSpeech()
-                    {
-                        Text = speech
-                    },
-                    ShouldEndSession = true,
-                    Directives = {
-                        new DisplayRenderTemplateDirective()
-                        {
-                            Template = new BodyTemplate1() {
-                                Token = "Directions-Map",
-                                Title="Liquid Summit Directions",
-                                Content = new TemplateContent()
-                                {
-                                    Primary = new TemplateText() {
-                                        Type = "PlainText",
-                                        Text = $"{directions.details.directions}"
-                                    }
-                                }
-                            }
-                        },
-                        new HintDirective() {
-                            Hint = new Hint(){
-                                Type="PlainText",
-                                Text = "send me directions to the conference."
-                            }
-                        }
-                    }
-                }
-            };
+            //return new SkillResponse()
+            //{
+            //    Version = "1.0",
+            //    Response = new ResponseBody()
+            //    {
+            //        Card = new StandardCard()
+            //        {
+            //            Title = $"{title}",
+            //            Content = $"{directions.details.directions}",
+            //            Image = new CardImage
+            //            {
+            //                SmallImageUrl = directions.details.mapImage.First().url,
+            //                LargeImageUrl = directions.details.mapImage.First().url
+            //            }
+            //        },
+            //        OutputSpeech = new PlainTextOutputSpeech()
+            //        {
+            //            Text = speech
+            //        },
+            //        ShouldEndSession = true,
+            //        Directives = {
+            //            new DisplayRenderTemplateDirective()
+            //            {
+            //                Template = new BodyTemplate1() {
+            //                    Token = "Directions-Map",
+            //                    Title="Liquid Summit Directions",
+            //                    Content = new TemplateContent()
+            //                    {
+            //                        Primary = new TemplateText() {
+            //                            Type = "PlainText",
+            //                            Text = $"{directions.details.directions}"
+            //                        }
+            //                    }
+            //                }
+            //            },
+            //            new HintDirective() {
+            //                Hint = new Hint(){
+            //                    Type="PlainText",
+            //                    Text = "send me directions to the conference."
+            //                }
+            //            }
+            //        }
+            //    }
+            //};
         }
         #endregion
 
         // The service handlers are responsible for making service calls to Bing
         #region Service Handlers
-        private async Task<SpeakerDetails> GetTrafficInfoAsync()
+        private async Task<TrafficEvent> GetTrafficInfoAsync(string bridge)
         {
 
             string url = string.Format(MapUrl, MapApiKey);
 
             var json = await GetContentAsync(url);
 
-            Context.Logger.LogLine("GetKeynoteSpeakerAsync:");
+            Context.Logger.LogLine("GetTrafficInfoAsync:");
             Context.Logger.LogLine("-------------------------------");
             Context.Logger.LogLine($"Address: {url}");
             Context.Logger.LogLine($"Results: {json}");
             Context.Logger.LogLine("-------------------------------");
 
-            var speakerList = JsonConvert.DeserializeObject<SpeakerContentViewModel>(json);
-            var obj = JsonConvert.SerializeObject(speakerList);
+            var traffic = JsonConvert.DeserializeObject<TrafficEvent>(json);
 
-            Context.Logger.LogLine($"Results: {speakerList.speakers.Count}");
+            Context.Logger.LogLine($"Results: {traffic}");
 
-            if (speakerList.speakers == null || speakerList.speakers.Count == 0) return null;
-
-
-            return speakerList.speakers?.First()?.details;
+            return traffic;
 
         }
 
+        private async Task<string> GetContentAsync(string Url)
+        {
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(Url)
+            };
+
+            //client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
+
+            var response = client.GetAsync("");
+            var json = await response.Result.Content.ReadAsStringAsync();
+
+            return json;
+        }
         #endregion
 
         // Request Handlers are responsible for the three request types we could recieve.
         #region Request Handlers
+
         /// <summary>
         /// A sample Launch Request handler.  This returns rudimentary information about the app.
         /// </summary>
@@ -169,7 +180,6 @@ namespace Alexa.BridgeBot.Lambda
                     Text = "Welcome to the Bridge Bot. You can ask me for traffic information on any of the nearby bridges."
                 }
             );
-
         }
 
         /// <summary>
