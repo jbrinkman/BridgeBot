@@ -25,7 +25,7 @@ namespace Alexa.BridgeBot.Lambda
 
 		Dictionary<string, string> Bridges => new Dictionary<string, string>
 		{
-			{"san mateo bridge", "37.564618,-122.272450,37.631134,-122.112215 " },
+			{"san mateo bridge", "37.564618,-122.272450,37.631134,-122.112215" },
 			{"dumbarton bridge", "37.489248,-122.139863,37.537884,-122.070231" },
 			{"bay bridge", "37.537884,-122.070231,37.822621,-122.321842" },
 			{"golden gate bridge", "37.809331,-122.479695,37.829536,-122.477367" }
@@ -53,15 +53,21 @@ namespace Alexa.BridgeBot.Lambda
 		#region Intent Handlers
 		public SkillResponse HandleBridgeTrafficIntent(SkillRequest input)
 		{
+			IntentRequest request = input.Request as IntentRequest;
+			string bridgeName = request.Intent.Slots["BridgeName"].Value;
+
 			// Log the method type for debugging purposes
 			Context.Logger.LogLine("Calling HandleBridgeTrafficIntent Intent");
 
-			IntentRequest request = input.Request as IntentRequest;
 
 			string title = "Bridge Traffic";
-			string speech = $"I'm sorry, we couldn't find any traffic data for the {request.Intent.Slots["BridgeName"]}.";
+			string speech = $"I'm sorry, we couldn't find any traffic data for the {bridgeName}.";
 
+			if (Bridges.ContainsKey(bridgeName))
+			{
+				var traffic = GetTrafficInfoAsync(bridgeName).Result;
 
+			};
 
 			//var traffic = GetTrafficInfoAsync().Result;
 
@@ -129,7 +135,7 @@ namespace Alexa.BridgeBot.Lambda
 		private async Task<TrafficEvent> GetTrafficInfoAsync(string bridge)
 		{
 
-			string url = string.Format(MapUrl, MapApiKey);
+			string url = string.Format(MapUrl, MapApiKey, Bridges[bridge]);
 
 			var json = await GetContentAsync(url);
 
@@ -153,8 +159,6 @@ namespace Alexa.BridgeBot.Lambda
 			{
 				BaseAddress = new Uri(Url)
 			};
-
-			//client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey);
 
 			var response = client.GetAsync("");
 			var json = await response.Result.Content.ReadAsStringAsync();
@@ -219,7 +223,7 @@ namespace Alexa.BridgeBot.Lambda
 		{
 			Context = context;
 
-			MapApiKey = Environment.GetEnvironmentVariable("mapapikey");
+			MapApiKey = Environment.GetEnvironmentVariable("MapApiKey");
 
 			return handlers[input.Request.Type](input);
 		}
